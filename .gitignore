@@ -1,0 +1,26 @@
+Python
+
+pycache/ 
+*.pyc 
+*.pyo 
+*.pyd
+
+Virtual environment
+
+sentiment_env/
+
+Model and data files
+
+data/
+models/
+results/
+logs/
+
+IDE files
+
+.vscode/ 
+.idea/
+
+macOS-specific
+
+.DS_Store
