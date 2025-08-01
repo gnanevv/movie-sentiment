@@ -1,42 +1,34 @@
-import os
 import streamlit as st
-from transformers import BertForSequenceClassification, BertTokenizer
+from transformers import BertTokenizer, BertForSequenceClassification
 import torch
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
-try:
-    # Check if model exists
-    model_path = "models/sentiment_model"
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model not found at {model_path}. Run train_model.py first.")
+# Load model and tokenizer (assuming paths are set)
+tokenizer = BertTokenizer.from_pretrained("models/sentiment_model")
+model = BertForSequenceClassification.from_pretrained("models/sentiment_model")
 
-    # Load model and tokenizer
-    print("Loading model and tokenizer...")
-    model = BertForSequenceClassification.from_pretrained(model_path)
-    tokenizer = BertTokenizer.from_pretrained(model_path)
+def predict_sentiment(text, tokenizer, model):
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+    outputs = model(**inputs)
+    probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
+    sentiment = "Positive" if torch.argmax(probs) == 1 else "Negative"
+    return sentiment, probs
 
-    # Streamlit app
-    st.title("Movie Review Sentiment Analysis")
-    st.write("Enter a movie review to predict if it's positive or negative.")
+st.title("Movie Sentiment Analyzer")
+review = st.text_area("Enter a movie review:")
 
-    # Text input
-    user_input = st.text_area("Your Review:", "Type your movie review here...")
+if st.button("Analyze Sentiment"):
+    if review:
+        sentiment, probs = predict_sentiment(review, tokenizer, model)
+        st.success(f"Sentiment: **{sentiment}**")
 
-    if st.button("Predict"):
-        if not user_input.strip():
-            st.error("Please enter a review.")
-        else:
-            # Tokenize input
-            inputs = tokenizer(user_input, padding=True, truncation=True, max_length=128, return_tensors="pt")
-            
-            # Predict
-            model.eval()
-            with torch.no_grad():
-                outputs = model(**inputs)
-                prediction = torch.argmax(outputs.logits, dim=1).item()
-            
-            # Display result
-            sentiment = "Positive" if prediction == 1 else "Negative"
-            st.write(f"Sentiment: **{sentiment}**")
-
-except Exception as e:
-    st.error(f"Error in app: {e}")
+        # Word cloud
+        st.subheader("Word Cloud")
+        wordcloud = WordCloud(width=800, height=400, background_color="white").generate(review)
+        plt.figure(figsize=(10, 5))
+        plt.imshow(wordcloud, interpolation="bilinear")
+        plt.axis("off")
+        st.pyplot(plt)
+    else:
+        st.error("Please enter a review!")

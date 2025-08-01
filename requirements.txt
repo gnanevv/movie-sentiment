@@ -1,7 +1,7 @@
 transformers==4.44.2 
-torch==2.4.1 
+torch==2.7.1
 pandas==2.2.2 
 scikit-learn==1.5.2 
 streamlit==1.39.0 
 datasets==3.0.1 
-accelerate==0.34.2
+accelerate==0.34.2wordcloud==1.9.3
