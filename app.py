@@ -3,6 +3,7 @@ from transformers import BertTokenizer, BertForSequenceClassification
 import torch
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+import plotly.express as px
 
 # Load model and tokenizer (assuming paths are set)
 tokenizer = BertTokenizer.from_pretrained("models/sentiment_model")
@@ -30,5 +31,19 @@ if st.button("Analyze Sentiment"):
         plt.imshow(wordcloud, interpolation="bilinear")
         plt.axis("off")
         st.pyplot(plt)
+
+        # Sentiment confidence bar chart
+        st.subheader("Sentiment Confidence")
+        confidence_scores = probs[0].detach().numpy() * 100  # Convert to percentages
+        fig = px.bar(
+            x=["Negative", "Positive"],
+            y=confidence_scores,
+            labels={"x": "Sentiment", "y": "Confidence (%)"},
+            title="Model Confidence Scores",
+            color=["Negative", "Positive"],
+            color_discrete_map={"Negative": "#FF6B6B", "Positive": "#4CAF50"}
+        )
+        fig.update_layout(width=600, height=400)
+        st.plotly_chart(fig)
     else:
         st.error("Please enter a review!")
