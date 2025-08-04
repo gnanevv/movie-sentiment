@@ -33,8 +33,7 @@ st.title("🎬 Movie Sentiment Analyzer")
 st.markdown("Analyze movie review sentiments with BERT and explore word importance.")
 
 # Tabs for different functionalities
-tab1, tab2 = st.tabs(["Sentiment Analysis", "Explainability"])
-
+tab1, tab2, tab3 = st.tabs(["Sentiment Analysis", "Explainability", "Multi-Class Sentiment"])
 # Tab 1: Sentiment Analysis
 with tab1:
     st.header("Analyze Sentiment")
@@ -83,5 +82,34 @@ with tab2:
             plt.figure(figsize=(10, 5))
             shap.plots.text(shap_values, display=False)
             st.pyplot(plt)
+        else:
+            st.error("Please enter a review!")
+# Tab 3: Multi-Class Sentiment
+with tab3:
+    st.header("Multi-Class Sentiment Analysis")
+    review = st.text_area("Enter a movie review for multi-class prediction:", height=150, key="multiclass_input")
+    if st.button("Analyze Multi-Class Sentiment"):
+        if review:
+            inputs = tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=512)
+            with torch.no_grad():
+                outputs = model(**inputs)
+            probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
+            labels = ["Very Negative", "Negative", "Neutral", "Positive", "Very Positive"]
+            predicted_label = labels[torch.argmax(probs).item()]
+            st.success(f"Sentiment: **{predicted_label}**")
+            
+            # Confidence bar chart
+            st.subheader("Multi-Class Confidence")
+            confidence_scores = probs[0].detach().numpy() * 100
+            fig = px.bar(
+                x=labels,
+                y=confidence_scores,
+                labels={"x": "Sentiment", "y": "Confidence (%)"},
+                title="Multi-Class Confidence Scores",
+                color=labels,
+                color_discrete_sequence=px.colors.qualitative.Plotly
+            )
+            fig.update_layout(width=600, height=400)
+            st.plotly_chart(fig)
         else:
             st.error("Please enter a review!")
