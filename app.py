@@ -42,7 +42,7 @@ st.title("🎬 Movie Sentiment Analyzer")
 st.markdown("Analyze movie review sentiments with BERT and explore word importance.")
 
 # Tabs for different functionalities
-tab1, tab2, tab3 = st.tabs(["Sentiment Analysis", "Explainability", "Multi-Class Sentiment"])
+tab1, tab2, tab3, tab4 = st.tabs(["Sentiment Analysis", "Explainability", "Multi-Class Sentiment", "Transfer Learning"])
 
 # Tab 1: Sentiment Analysis (Binary)
 with tab1:
@@ -119,6 +119,37 @@ with tab3:
                 title="Multi-Class Confidence Scores",
                 color=labels,
                 color_discrete_sequence=px.colors.qualitative.Plotly
+            )
+            fig.update_layout(width=600, height=400)
+            st.plotly_chart(fig)
+        else:
+            st.error("Please enter a review!")
+# Tab 4: Transfer Learning (Placeholder)
+# Tab 4: Transfer Learning
+with tab4:
+    st.header("Transfer Learning Sentiment Analysis")
+    review = st.text_area("Enter a movie review for transfer learning:", height=150, key="transfer_input")
+    if st.button("Analyze Transfer Sentiment"):
+        if review:
+            transfer_tokenizer = BertTokenizer.from_pretrained("/Users/georginanev/Documents/movie-sentiment/models/emotion_model")
+            transfer_model = BertForSequenceClassification.from_pretrained("/Users/georginanev/Documents/movie-sentiment/models/emotion_model", num_labels=2)
+            inputs = transfer_tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=512)
+            with torch.no_grad():
+                outputs = transfer_model(**inputs)
+            probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
+            sentiment = "Positive" if torch.argmax(probs) == 1 else "Negative"
+            st.success(f"Sentiment (Transfer Learning): **{sentiment}**")
+            
+            # Confidence bar chart
+            st.subheader("Transfer Learning Confidence")
+            confidence_scores = probs[0].detach().numpy() * 100
+            fig = px.bar(
+                x=["Negative", "Positive"],
+                y=confidence_scores,
+                labels={"x": "Sentiment", "y": "Confidence (%)"},
+                title="Transfer Learning Confidence Scores",
+                color=["Negative", "Positive"],
+                color_discrete_map={"Negative": "#FF6B6B", "Positive": "#4CAF50"}
             )
             fig.update_layout(width=600, height=400)
             st.plotly_chart(fig)
