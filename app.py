@@ -1,23 +1,32 @@
 import streamlit as st
-from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import BertTokenizer, BertForSequenceClassification, pipeline
 import torch
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import plotly.express as px
 import shap
-from transformers import pipeline
+import os
 
-# Load model and tokenizer
-model_path = "/Users/georginanev/Documents/movie-sentiment/models/sentiment_model"  # Update with your actual model path
+# Load binary sentiment model
+binary_model_path = "/Users/georginanev/Documents/movie-sentiment/models/sentiment_model"  # Update with your actual path
 try:
-    tokenizer = BertTokenizer.from_pretrained(model_path)
-    model = BertForSequenceClassification.from_pretrained(model_path)
-    sentiment_pipeline = pipeline("sentiment-analysis", model=model_path, tokenizer=model_path)
+    tokenizer = BertTokenizer.from_pretrained(binary_model_path)
+    model = BertForSequenceClassification.from_pretrained(binary_model_path)
+    sentiment_pipeline = pipeline("sentiment-analysis", model=binary_model_path, tokenizer=binary_model_path)
 except OSError as e:
-    st.error(f"Error loading model: {e}")
+    st.error(f"Error loading binary model: {e}")
     st.stop()
 
-# Create SHAP explainer
+# Load multi-class model
+multi_model_path = "/Users/georginanev/Documents/movie-sentiment/models/sentiment_model_multi"
+try:
+    multi_tokenizer = BertTokenizer.from_pretrained(multi_model_path)
+    multi_model = BertForSequenceClassification.from_pretrained(multi_model_path)
+except OSError as e:
+    st.error(f"Error loading multi-class model: {e}")
+    st.stop()
+
+# Create SHAP explainer for binary model
 explainer = shap.Explainer(sentiment_pipeline)
 
 def predict_sentiment(text, tokenizer, model):
@@ -34,7 +43,8 @@ st.markdown("Analyze movie review sentiments with BERT and explore word importan
 
 # Tabs for different functionalities
 tab1, tab2, tab3 = st.tabs(["Sentiment Analysis", "Explainability", "Multi-Class Sentiment"])
-# Tab 1: Sentiment Analysis
+
+# Tab 1: Sentiment Analysis (Binary)
 with tab1:
     st.header("Analyze Sentiment")
     review = st.text_area("Enter a movie review:", height=150, key="sentiment_input")
@@ -84,15 +94,16 @@ with tab2:
             st.pyplot(plt)
         else:
             st.error("Please enter a review!")
+
 # Tab 3: Multi-Class Sentiment
 with tab3:
     st.header("Multi-Class Sentiment Analysis")
     review = st.text_area("Enter a movie review for multi-class prediction:", height=150, key="multiclass_input")
     if st.button("Analyze Multi-Class Sentiment"):
         if review:
-            inputs = tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=512)
+            inputs = multi_tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=512)
             with torch.no_grad():
-                outputs = model(**inputs)
+                outputs = multi_model(**inputs)
             probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
             labels = ["Very Negative", "Negative", "Neutral", "Positive", "Very Positive"]
             predicted_label = labels[torch.argmax(probs).item()]
