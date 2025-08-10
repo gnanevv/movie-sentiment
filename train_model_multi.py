@@ -1,31 +1,42 @@
-from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 from datasets import load_from_disk
-import torch
-from torch.utils.data import DataLoader
 from transformers import Trainer, TrainingArguments
+import os
+import torch
+
+# Create directories
+os.makedirs("results/multi", exist_ok=True)
+os.makedirs("logs/multi", exist_ok=True)
 
 # Load data
 dataset = load_from_disk("data/sst5_data")
-tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 
 def tokenize_function(examples):
-    return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
+    tokenized = tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
+    tokenized["labels"] = examples["label"]
+    return tokenized
 
 tokenized_dataset = dataset.map(tokenize_function, batched=True)
+tokenized_dataset.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
 train_dataset = tokenized_dataset["train"]
-eval_dataset = tokenized_dataset["validation"]
+eval_dataset = tokenized_dataset["test"]
 
-# Load model for 5-class classification
-model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=5)
+# Load model
+model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=5)
+model = model.to("mps" if torch.backends.mps.is_available() else "cpu")
 
-# Training arguments
+# Training arguments optimized for M1 Pro
 training_args = TrainingArguments(
-    output_dir="results/multi_class",
-    evaluation_strategy="epoch",
-    per_device_train_batch_size=8,
-    per_device_eval_batch_size=8,
+    output_dir="results/multi",
+    eval_strategy="epoch",
+    per_device_train_batch_size=4,
+    per_device_eval_batch_size=4,
     num_train_epochs=3,
-    logging_dir="logs/multi_class",
+    logging_dir="logs/multi",
+    gradient_accumulation_steps=2,
+    save_strategy="epoch",
+    save_total_limit=2,
 )
 
 # Trainer
