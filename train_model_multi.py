@@ -10,41 +10,45 @@ os.makedirs("logs/multi", exist_ok=True)
 
 # Load data
 dataset = load_from_disk("data/sst5_data")
+dataset = dataset.shuffle(seed=42)
+train_dataset = dataset["train"].select(range(1000))  # 1000 samples
+eval_dataset = dataset["test"].select(range(200))    # 200 samples
 tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 
 def tokenize_function(examples):
-    tokenized = tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
+    tokenized = tokenizer(examples["text"], padding="max_length", truncation=True, max_length=128)
     tokenized["labels"] = examples["label"]
     return tokenized
 
-tokenized_dataset = dataset.map(tokenize_function, batched=True)
-tokenized_dataset.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
-train_dataset = tokenized_dataset["train"]
-eval_dataset = tokenized_dataset["test"]
+tokenized_train = train_dataset.map(tokenize_function, batched=True)
+tokenized_eval = eval_dataset.map(tokenize_function, batched=True)
+tokenized_train.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
+tokenized_eval.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
 
 # Load model
 model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=5)
 model = model.to("mps" if torch.backends.mps.is_available() else "cpu")
 
-# Training arguments optimized for M1 Pro
+# Training arguments optimized for speed
 training_args = TrainingArguments(
     output_dir="results/multi",
     eval_strategy="epoch",
-    per_device_train_batch_size=4,
-    per_device_eval_batch_size=4,
-    num_train_epochs=3,
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=1,
     logging_dir="logs/multi",
-    gradient_accumulation_steps=2,
+    gradient_accumulation_steps=4,
     save_strategy="epoch",
-    save_total_limit=2,
+    save_total_limit=1,
+    fp16=False,
 )
 
 # Trainer
 trainer = Trainer(
     model=model,
     args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=eval_dataset,
+    train_dataset=tokenized_train,
+    eval_dataset=tokenized_eval,
 )
 
 # Train and save

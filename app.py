@@ -18,9 +18,9 @@ try:
     tokenizer = DistilBertTokenizer.from_pretrained(binary_model_path)
     model = DistilBertForSequenceClassification.from_pretrained(binary_model_path)
     model = model.to(device)
-    sentiment_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
+    sentiment_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer, device=device)
 except (OSError, ValueError) as e:
-    st.error(f"Error loading binary model: {e}. Ensure the model is DistilBERT-based and properly saved.")
+    st.error(f"Error loading binary model: {e}. Run `python3 train_model.py` to retrain.")
     st.stop()
 
 # Load multi-class model
@@ -30,7 +30,7 @@ try:
     multi_model = DistilBertForSequenceClassification.from_pretrained(multi_model_path)
     multi_model = multi_model.to(device)
 except (OSError, ValueError) as e:
-    st.error(f"Error loading multi-class model: {e}. Ensure the model is DistilBERT-based and properly saved.")
+    st.error(f"Error loading multi-class model: {e}. Run `python3 train_model_multi.py` to retrain.")
     st.stop()
 
 # Load emotion model (Transfer Learning)
@@ -40,17 +40,17 @@ try:
     emotion_model = DistilBertForSequenceClassification.from_pretrained(emotion_model_path, num_labels=2)
     emotion_model = emotion_model.to(device)
 except (OSError, ValueError) as e:
-    st.error(f"Error loading emotion model: {e}. Ensure the model is DistilBERT-based and properly saved.")
+    st.error(f"Error loading emotion model: {e}. Run `python3 train_model_emotion.py` to retrain.")
     st.stop()
 
 # Load ABSA model
 absa_model_path = "/Users/georginanev/Documents/movie-sentiment/models/absa_model"
 try:
     absa_tokenizer = DistilBertTokenizer.from_pretrained(absa_model_path)
-    absa_model = DistilBertForSequenceClassification.from_pretrained(absa_model_path)
+    absa_model = DistilBertForSequenceClassification.from_pretrained(absa_model_path, num_labels=3)
     absa_model = absa_model.to(device)
 except (OSError, ValueError) as e:
-    st.error(f"Error loading ABSA model: {e}. Ensure the model is DistilBERT-based and properly saved.")
+    st.error(f"Error loading ABSA model: {e}. Run `python3 train_model_absa.py` to retrain.")
     st.stop()
 
 # Load multimodal model (Placeholder)
@@ -60,7 +60,7 @@ try:
     multimodal_model = DistilBertForSequenceClassification.from_pretrained(multimodal_model_path)
     multimodal_model = multimodal_model.to(device)
 except (OSError, ValueError) as e:
-    st.warning(f"Multimodal model not loaded: {e}. Using text-only placeholder.")
+    st.warning(f"Multimodal model not loaded: {e}. Run `python3 train_model_multimodal.py` to retrain.")
 
 # Create SHAP explainer for binary model
 try:
@@ -70,7 +70,7 @@ except Exception as e:
     st.stop()
 
 def predict_sentiment(text, tokenizer, model):
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512).to(device)
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=128).to(device)
     outputs = model(**inputs)
     probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
     sentiment = "Positive" if torch.argmax(probs) == 1 else "Negative"
@@ -148,7 +148,7 @@ with tab3:
     review = st.text_area("Enter a movie review for multi-class prediction:", height=150, key="multiclass_input")
     if st.button("Analyze Multi-Class Sentiment"):
         if review:
-            inputs = multi_tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=512).to(device)
+            inputs = multi_tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=128).to(device)
             with torch.no_grad():
                 outputs = multi_model(**inputs)
             probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
@@ -178,7 +178,7 @@ with tab4:
     review = st.text_area("Enter a movie review for transfer learning:", height=150, key="transfer_input")
     if st.button("Analyze Transfer Sentiment"):
         if review:
-            inputs = emotion_tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=512).to(device)
+            inputs = emotion_tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=128).to(device)
             with torch.no_grad():
                 outputs = emotion_model(**inputs)
             probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
@@ -208,17 +208,17 @@ with tab5:
     aspect = st.text_input("Enter an aspect (e.g., acting, plot):", key="absa_aspect")
     if st.button("Analyze Aspect Sentiment"):
         if review and aspect:
-            inputs = absa_tokenizer(f"{review} [SEP] {aspect}", return_tensors="pt", truncation=True, padding=True, max_length=512).to(device)
+            inputs = absa_tokenizer(f"{review} [SEP] {aspect}", return_tensors="pt", truncation=True, padding=True, max_length=128).to(device)
             with torch.no_grad():
                 outputs = absa_model(**inputs)
             probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
             labels = ["Negative", "Neutral", "Positive"]
-            predicted_label = labels[torch.argmax(probs).item() % len(labels)]
+            predicted_label = labels[torch.argmax(probs).item()]
             st.success(f"Aspect '{aspect}' Sentiment: **{predicted_label}**")
             
             # Confidence bar chart
             st.subheader("Aspect Confidence")
-            confidence_scores = probs[0].detach().cpu().numpy()[:3] * 100
+            confidence_scores = probs[0].detach().cpu().numpy() * 100
             fig = px.bar(
                 x=labels,
                 y=confidence_scores,
@@ -232,15 +232,15 @@ with tab5:
         else:
             st.error("Please enter a review and an aspect!")
 
-# Tab 6: Multimodal Sentiment (Placeholder)
-with tab6:
+# # Tab 6: Multimodal Sentiment (Placeholder)
+# with tab6:
     st.header("Multimodal Sentiment Analysis")
     st.warning("Multimodal analysis is a placeholder due to lack of paired text-image dataset.")
     review = st.text_area("Enter a movie review:", height=150, key="multimodal_review")
     image = st.file_uploader("Upload a movie poster (optional):", type=["jpg", "png"], key="multimodal_image")
     if st.button("Analyze Multimodal Sentiment"):
         if review:
-            inputs = multimodal_tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=512).to(device)
+            inputs = multimodal_tokenizer(review, return_tensors="pt", truncation=True, padding=True, max_length=128).to(device)
             with torch.no_grad():
                 outputs = multimodal_model(**inputs)
             probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
